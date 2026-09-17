@@ -1,0 +1,67 @@
+{
+  "robot_id": "so101_dual",
+  "profile": "so101_dual",
+  "notes": "SO101 dual-arm template. Copy to so101_dual_manifest.json and fill YOUR serial by-id paths + camera indices.",
+  "datasets": {
+    "root": "~/rlt_so101_dual/data/so101_dual",
+    "fps": 30
+  },
+  "arms": [
+    {
+      "alias": "left_follower",
+      "type": "follower",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_REPLACE_LEFT_FOLLOWER-if00",
+      "calibration_dir": "~/.cache/huggingface/lerobot/calibration/robots/so_follower",
+      "calibration_file": "~/.cache/huggingface/lerobot/calibration/robots/so_follower/left_follower_arm.json"
+    },
+    {
+      "alias": "right_follower",
+      "type": "follower",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_REPLACE_RIGHT_FOLLOWER-if00",
+      "calibration_dir": "~/.cache/huggingface/lerobot/calibration/robots/so_follower",
+      "calibration_file": "~/.cache/huggingface/lerobot/calibration/robots/so_follower/right_follower_arm.json"
+    },
+    {
+      "alias": "left_leader",
+      "type": "leader",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_REPLACE_LEFT_LEADER-if00",
+      "calibration_dir": "~/.cache/huggingface/lerobot/calibration/teleoperators/so_leader",
+      "calibration_file": "~/.cache/huggingface/lerobot/calibration/teleoperators/so_leader/left_leader_arm.json"
+    },
+    {
+      "alias": "right_leader",
+      "type": "leader",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_REPLACE_RIGHT_LEADER-if00",
+      "calibration_dir": "~/.cache/huggingface/lerobot/calibration/teleoperators/so_leader",
+      "calibration_file": "~/.cache/huggingface/lerobot/calibration/teleoperators/so_leader/right_leader_arm.json"
+    }
+  ],
+  "cameras": [
+    {
+      "alias": "left_wrist",
+      "port": 0,
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "fourcc": "YUYV"
+    },
+    {
+      "alias": "right_wrist",
+      "port": 1,
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "fourcc": "YUYV"
+    },
+    {
+      "alias": "right_front",
+      "port": 2,
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "fourcc": "YUYV"
+    }
+  ],
+  "rlt_config": "configs/rlt/so101_dual_rlt.yaml",
+  "rename_map": "configs/rename_maps/so101_dual.json"
+}

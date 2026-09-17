@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=71", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlt-so101-dual"
+version = "0.1.0"
+description = "RLT on SO101 dual-arm: LeRobot + pi0.5 + RL Token (collect / train / real-robot online RL)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "torch>=2.2",
+    "numpy>=1.23",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+lerobot = [
+    "lerobot[pi] @ https://github.com/huggingface/lerobot/archive/refs/tags/v0.5.1.tar.gz",
+    "safetensors>=0.4.3",
+    "packaging>=24.0",
+    "evdev>=1.7",
+    "feetech-servo-sdk>=1.0.0",
+]
+test = ["pytest>=8.1", "pytest-timeout>=2.4"]
+wandb = ["wandb>=0.16"]
+# Deliberately excludes the `lerobot` extra. That extra points at a GitHub
+# tarball, which pip re-downloads and reinstalls every time even when the
+# same version is already present -- so `pip install -e .[dev]` would wipe
+# any local change to the installed lerobot. Install lerobot once, then use
+# this for the tooling.
+dev = ["rlt-so101-dual[test,wandb]", "ruff>=0.6"]
+
+[project.scripts]
+rlt-so101-dual-build-transition-cache-v2 = "rlt_so101_dual.cli.build_transition_cache_v2:main"
+rlt-so101-dual-train-actor-critic = "rlt_so101_dual.cli.train_chunk_actor_critic:main"
+rlt-so101-dual-train-rl-token = "rlt_so101_dual.cli.train_rl_token:main"
+rlt-so101-dual-record = "rlt_so101_dual.adapters.lerobot.record.cli:main"
+rlt-so101-dual-online-train = "rlt_so101_dual.adapters.lerobot.record.online_cli:main"
+rlt-so101-dual-prune-online-state = "rlt_so101_dual.adapters.lerobot.record.prune_state_cli:main"
+rlt-so101-dual-camera-preview = "rlt_so101_dual.diagnostics.camera_preview:main"
+rlt-so101-dual-check-dataset = "rlt_so101_dual.diagnostics.dataset_acceptance:main"
+rlt-so101-dual-critic-health = "rlt_so101_dual.diagnostics.critic_action_sensitivity:main"
+rlt-so101-dual-preflight = "rlt_so101_dual.diagnostics.preflight:main"
+rlt-so101-dual-record-pose = "rlt_so101_dual.diagnostics.record_pose:main"
+rlt-so101-dual-replay = "rlt_so101_dual.diagnostics.replay:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+# pytest-timeout is a declared dependency; without a value it was never used.
+# A hung hardware or CUDA call should fail the run, not stall it forever.
+timeout = 300
+
+[tool.ruff]
+target-version = "py312"   # matches requires-python
+line-length = 110

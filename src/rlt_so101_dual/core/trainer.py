@@ -1,0 +1,369 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import asdict, dataclass, field
+
+import torch
+
+from rlt_so101_dual.core.algorithm import RLTAlgorithm
+from rlt_so101_dual.core.collector import Environment, rl_collect_step, warmup_collect
+from rlt_so101_dual.core.config import RLTConfig
+from rlt_so101_dual.core.losses import actor_loss, critic_loss
+from rlt_so101_dual.core.replay_buffer import ReplayBuffer
+from rlt_so101_dual.core.rl_token import RLTokenModule
+from rlt_so101_dual.core.utils import soft_update
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TrainingMetrics:
+    """Accumulated metrics for a training run."""
+
+    critic_losses: list[float] = field(default_factory=list)
+    actor_losses: list[float] = field(default_factory=list)
+    reconstruction_losses: list[float] = field(default_factory=list)
+    env_steps: int = 0
+
+
+def _build_rl_checkpoint_metadata(config: RLTConfig, metadata: dict | None = None) -> dict:
+    """Merge caller metadata with the full actor/critic training config."""
+    merged = dict(metadata or {})
+    merged["actor"] = asdict(config.actor)
+    merged["critic"] = asdict(config.critic)
+    merged["training"] = {
+        "gamma": config.training.gamma,
+        "beta": config.training.beta,
+        "tau": config.training.tau,
+        "batch_size": config.training.batch_size,
+        "utd_ratio": config.training.utd_ratio,
+        "actor_update_interval": config.training.actor_update_interval,
+    }
+    merged["chunk_length"] = config.chunk_length
+    merged["action_dim"] = config.action_dim
+    merged["proprio_dim"] = config.proprio_dim
+    return merged
+
+
+def _cosine_lr(step: int, warmup: int, total: int, peak_lr: float, min_lr: float) -> float:
+    """Cosine LR schedule with linear warmup."""
+    import math
+    if step < warmup:
+        return peak_lr * step / max(warmup, 1)
+    progress = (step - warmup) / max(total - warmup, 1)
+    return min_lr + 0.5 * (peak_lr - min_lr) * (1.0 + math.cos(math.pi * progress))
+
+
+def demo_adaptation(
+    algorithm: RLTAlgorithm,
+    config: RLTConfig,
+    demo_loader,
+    demo_optimizer: torch.optim.Optimizer | None = None,
+    rl_token_full: RLTokenModule | None = None,
+    save_dir: str | None = None,
+    save_every: int = 2000,
+    start_step: int = 0,
+    prior_losses: list[float] | None = None,
+    metadata: dict | None = None,
+    dim_std: torch.Tensor | None = None,
+    norm_gamma: float = 0.0,
+) -> list[float]:
+    """Demo adaptation phase: L_ro + alpha * L_vla.
+
+    After adaptation, freezes VLA and RL token encoder.
+    Includes gradient clipping, cosine LR schedule, periodic checkpointing.
+
+    If rl_token_full is provided (e.g. when the caller already created it
+    and passed its parameters to demo_optimizer), it is used directly.
+    Otherwise a new one is built via algorithm.build_rl_token_full().
+
+    dim_std + norm_gamma enable per-dim weighted MSE in reconstruction_loss.
+    """
+    import gc
+
+    policy = algorithm.policy
+    device = next(policy.parameters()).device
+    if rl_token_full is None:
+        rl_token_full = algorithm.build_rl_token_full(device)
+
+    if demo_optimizer is None:
+        demo_params = list(rl_token_full.parameters()) + list(policy.vla.parameters())
+        demo_optimizer = torch.optim.Adam(demo_params, lr=config.demo_adaptation.lr)
+
+    alpha = config.demo_adaptation.vla_ft_weight
+    grad_clip = config.demo_adaptation.grad_clip_norm
+    warmup = config.demo_adaptation.warmup_steps
+    total_steps = config.demo_adaptation.steps
+    peak_lr = config.demo_adaptation.lr
+    min_lr = config.demo_adaptation.min_lr
+    losses: list[float] = list(prior_losses) if prior_losses else []
+    rl_token_full.train()
+
+    step = start_step
+    for obs, expert_actions in demo_loader:
+        if step >= total_steps:
+            break
+
+        # Update learning rate
+        lr = _cosine_lr(step, warmup, total_steps, peak_lr, min_lr)
+        for pg in demo_optimizer.param_groups:
+            pg["lr"] = lr
+
+        vla_out = policy.vla.forward_vla(obs)
+        l_ro = rl_token_full.reconstruction_loss(
+            vla_out.final_tokens, dim_std=dim_std, gamma=norm_gamma,
+        )
+        l_vla = policy.vla.supervised_loss(obs, expert_actions)
+        loss = l_ro + alpha * l_vla
+
+        demo_optimizer.zero_grad()
+        loss.backward()
+
+        # Gradient clipping
+        trainable_params = [p for p in rl_token_full.parameters() if p.requires_grad]
+        if alpha > 0:
+            trainable_params += [p for p in policy.vla.parameters() if p.requires_grad]
+        torch.nn.utils.clip_grad_norm_(trainable_params, grad_clip)
+
+        demo_optimizer.step()
+
+        loss_val = loss.item()
+        losses.append(loss_val)
+
+        if step % 100 == 0:
+            avg_100 = sum(losses[-100:]) / min(len(losses), 100)
+            logger.info("Step %d/%d loss=%.4f avg100=%.4f lr=%.2e", step, total_steps, loss_val, avg_100, lr)
+
+        # Periodic checkpoint
+        if save_dir and step > 0 and step % save_every == 0:
+            _save_checkpoint(rl_token_full, losses, step, save_dir, metadata)
+
+        # Periodic memory cleanup
+        if step % 500 == 0:
+            gc.collect()
+            torch.cuda.empty_cache()
+
+        step += 1
+
+    # Sync encoder weights back to the inference-only policy
+    algorithm.sync_encoder_from_full(rl_token_full)
+
+    # Final save
+    if save_dir:
+        _save_checkpoint(rl_token_full, losses, step, save_dir, metadata)
+
+    policy.freeze_vla()
+    policy.freeze_rl_token_encoder()
+    logger.info("Demo adaptation complete (%d steps). VLA and RL token encoder frozen.", step)
+
+    return losses
+
+
+def _save_checkpoint(rl_token_full, losses: list[float], step: int, save_dir: str, metadata: dict | None = None) -> None:
+    """Save training checkpoint."""
+    import json
+    from pathlib import Path
+
+    path = Path(save_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    ckpt = {
+        "rl_token_state_dict": rl_token_full.state_dict(),
+        "step": step,
+        "losses": losses,
+    }
+    if metadata:
+        ckpt["metadata"] = metadata
+    torch.save(ckpt, path / "demo_adapt_checkpoint.pt")
+    with open(path / "losses.json", "w") as f:
+        json.dump(losses, f)
+    logger.info("Checkpoint saved at step %d to %s (loss=%.4f)", step, save_dir, losses[-1] if losses else 0)
+
+
+def _run_replay_updates(
+    algorithm: RLTAlgorithm,
+    replay_buffer: ReplayBuffer,
+    critic_optimizer: torch.optim.Optimizer,
+    actor_optimizer: torch.optim.Optimizer,
+    metrics: TrainingMetrics,
+    config: RLTConfig,
+    critic_update_count: int,
+) -> int:
+    """Run UTD replay updates. Returns updated critic_update_count."""
+    C = config.chunk_length
+    gamma = config.training.gamma
+    beta = config.training.beta
+    tau = config.training.tau
+    utd = config.training.utd_ratio
+    actor_interval = config.training.actor_update_interval
+    batch_size = config.training.batch_size
+
+    for _ in range(utd):
+        batch = replay_buffer.sample(batch_size)
+
+        c_loss = algorithm.critic_update(batch, critic_optimizer, gamma, C)
+        metrics.critic_losses.append(c_loss)
+        critic_update_count += 1
+
+        if critic_update_count % actor_interval == 0:
+            a_loss = algorithm.actor_update(batch, actor_optimizer, beta)
+            metrics.actor_losses.append(a_loss)
+
+        algorithm.soft_update_target(tau)
+
+    return critic_update_count
+
+
+def online_rl_loop(
+    algorithm: RLTAlgorithm,
+    config: RLTConfig,
+    env: Environment,
+    replay_buffer: ReplayBuffer,
+    actor_optimizer: torch.optim.Optimizer | None = None,
+    critic_optimizer: torch.optim.Optimizer | None = None,
+) -> TrainingMetrics:
+    """Online RL training loop: warmup + collect + UTD updates."""
+    if actor_optimizer is None:
+        actor_optimizer = torch.optim.Adam(algorithm.policy.actor.parameters(), lr=config.actor.lr)
+    if critic_optimizer is None:
+        critic_optimizer = torch.optim.Adam(algorithm.critic.parameters(), lr=config.critic.lr)
+
+    metrics = TrainingMetrics()
+    batch_size = config.training.batch_size
+
+    # Warmup
+    logger.info("Starting warmup for %d steps", config.collector.warmup_steps)
+    warmup_steps = warmup_collect(env, algorithm.policy, replay_buffer, config.collector.warmup_steps, config.chunk_length)
+    metrics.env_steps += warmup_steps
+    logger.info("Warmup done. Buffer size: %d", len(replay_buffer))
+
+    # Online RL
+    obs = env.reset()
+    critic_update_count = 0
+    total_steps = 0
+
+    while total_steps < config.collector.total_env_steps:
+        algorithm.eval()
+        obs, done, steps = rl_collect_step(env, algorithm.policy, obs, replay_buffer, config.chunk_length)
+        total_steps += steps
+        metrics.env_steps += steps
+
+        if done:
+            obs = env.reset()
+
+        if len(replay_buffer) < batch_size:
+            continue
+
+        algorithm.train()
+        critic_update_count = _run_replay_updates(
+            algorithm, replay_buffer, critic_optimizer, actor_optimizer,
+            metrics, config, critic_update_count,
+        )
+
+    logger.info(
+        "Online RL done. %d env steps, %d critic updates, %d actor updates",
+        metrics.env_steps, len(metrics.critic_losses), len(metrics.actor_losses),
+    )
+    return metrics
+
+
+def _save_rl_checkpoint(
+    algorithm: RLTAlgorithm,
+    actor_opt: torch.optim.Optimizer,
+    critic_opt: torch.optim.Optimizer,
+    step: int,
+    metrics: TrainingMetrics,
+    save_dir: str,
+    metadata: dict | None = None,
+) -> None:
+    """Save RL training checkpoint (actor, critic, target, optimizers, step, metrics)."""
+    from pathlib import Path
+
+    path = Path(save_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    ckpt = {
+        "actor_state_dict": algorithm.policy.actor.state_dict(),
+        "critic_state_dict": algorithm.critic.state_dict(),
+        "target_critic_state_dict": algorithm.target_critic.state_dict(),
+        "actor_optimizer": actor_opt.state_dict(),
+        "critic_optimizer": critic_opt.state_dict(),
+        "step": step,
+        "critic_losses": metrics.critic_losses,
+        "actor_losses": metrics.actor_losses,
+    }
+    ckpt["metadata"] = _build_rl_checkpoint_metadata(algorithm.config, metadata)
+    torch.save(ckpt, path / "rl_checkpoint.pt")
+    logger.info("RL checkpoint saved at step %d to %s", step, save_dir)
+
+
+def _batch_to_device(batch: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
+    """Move all tensors in a batch dict to the given device."""
+    return {k: v.to(device) for k, v in batch.items()}
+
+
+def offline_rl_loop(
+    algorithm: RLTAlgorithm,
+    config: RLTConfig,
+    replay_buffer: ReplayBuffer,
+    val_buffer: ReplayBuffer | None = None,
+    actor_optimizer: torch.optim.Optimizer | None = None,
+    critic_optimizer: torch.optim.Optimizer | None = None,
+    save_dir: str | None = None,
+    metadata: dict | None = None,
+) -> TrainingMetrics:
+    """Offline RL training loop: gradient steps on a fixed replay buffer."""
+    if actor_optimizer is None:
+        actor_optimizer = torch.optim.Adam(algorithm.policy.actor.parameters(), lr=config.actor.lr)
+    if critic_optimizer is None:
+        critic_optimizer = torch.optim.Adam(algorithm.critic.parameters(), lr=config.critic.lr)
+
+    metrics = TrainingMetrics()
+    off_cfg = config.offline_rl
+    C = config.chunk_length
+    gamma = config.training.gamma
+    beta = config.training.beta
+    tau = config.training.tau
+    utd = config.training.utd_ratio
+    actor_interval = config.training.actor_update_interval
+    batch_size = config.training.batch_size
+    critic_update_count = 0
+    device = next(algorithm.parameters()).device
+
+    algorithm.train()
+    # `num_gradient_steps` is outer steps; total gradient updates = utd * num_gradient_steps.
+    for step in range(1, off_cfg.num_gradient_steps + 1):
+        c_loss = 0.0
+        a_loss = None
+        for _ in range(utd):
+            batch = _batch_to_device(replay_buffer.sample(batch_size), device)
+
+            c_loss = algorithm.critic_update(batch, critic_optimizer, gamma, C)
+            metrics.critic_losses.append(c_loss)
+            critic_update_count += 1
+
+            if critic_update_count % actor_interval == 0:
+                a_loss = algorithm.actor_update(batch, actor_optimizer, beta)
+                metrics.actor_losses.append(a_loss)
+
+        algorithm.soft_update_target(tau)
+
+        if step % off_cfg.log_every == 0:
+            a_str = f"{a_loss:.4f}" if a_loss is not None else "N/A"
+            logger.info("Step %d/%d  critic=%.4f  actor=%s", step, off_cfg.num_gradient_steps, c_loss, a_str)
+
+        if val_buffer is not None and step % off_cfg.eval_every == 0:
+            val_batch = _batch_to_device(val_buffer.sample(batch_size), device)
+            with torch.no_grad():
+                val_c = critic_loss(algorithm.critic, algorithm.target_critic, algorithm.policy.actor, val_batch, gamma, C)
+            logger.info("Step %d  val_critic=%.4f", step, val_c.item())
+
+        if save_dir and step % off_cfg.save_every == 0:
+            _save_rl_checkpoint(algorithm, actor_optimizer, critic_optimizer, step, metrics, save_dir, metadata)
+
+    if save_dir:
+        _save_rl_checkpoint(algorithm, actor_optimizer, critic_optimizer, off_cfg.num_gradient_steps, metrics, save_dir, metadata)
+
+    logger.info(
+        "Offline RL done. %d gradient steps, %d critic updates, %d actor updates",
+        off_cfg.num_gradient_steps, len(metrics.critic_losses), len(metrics.actor_losses),
+    )
+    return metrics

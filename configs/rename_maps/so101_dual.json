@@ -1,0 +1,5 @@
+{
+  "observation.images.right_front": "observation.images.base_0_rgb",
+  "observation.images.left_wrist": "observation.images.left_wrist_0_rgb",
+  "observation.images.right_wrist": "observation.images.right_wrist_0_rgb"
+}
