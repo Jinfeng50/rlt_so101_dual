@@ -12,11 +12,7 @@ outputs/
 pretrained/
 cache/
 wandb/
-data/*
-!data/README.md
-# Keep example outputs placeholder
-outputs/*
-!outputs/README.md
+data/
 # Local hardware overrides (keep .example.json in git)
 configs/hardware/so101_dual_manifest.json
 configs/hardware/so101_dual_manifest.local.json

@@ -119,8 +119,7 @@ class RLTDemoDataset(Dataset):
         (extra_episode_metadata=...)`` in ``lerobot_record.py`` around the episode-
         end hook. Canonical labels are ``"success"`` / ``"failure"`` (strings); bool
         and 0/1 numeric are also accepted. Strict on missing column: any dataset
-        that lacks ``episode_success`` must be relabeled before use — see
-        docs/rlt/rlt_pipeline_review_20260415_1839.md S2-2.
+        that lacks ``episode_success`` must be relabeled before use.
         """
         raw = self._dataset.meta.episodes["episode_success"][episode_idx]
         if isinstance(raw, str):
