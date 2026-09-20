@@ -15,11 +15,11 @@ RL Token 方法（[Physical Intelligence](https://www.pi.website/research/rlt)�
 
 ### 成功案例
 
-<video src="assets/成功.mp4" poster="assets/success-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+https://github.com/user-attachments/assets/4d54dbf1-9824-471b-91f6-3ea72269602a
 
 ### 失败案例
 
-<video src="assets/失败.mp4" poster="assets/failure-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+https://github.com/user-attachments/assets/4be130b2-9381-404e-81cc-ce5aa3d7d9ee
 
 ---
 
