@@ -6,7 +6,6 @@
 
 SO101 dual-arm scenario / demo adaptation of the RL Token method ([Physical Intelligence](https://www.pi.website/research/rlt), arXiv [2604.23073](https://arxiv.org/abs/2604.23073)). Not an official PI release.
 
-Code map: [`configs/README.md`](configs/README.md) · [`src/rlt_so101_dual/core/shape_contract.py`](src/rlt_so101_dual/core/shape_contract.py)
 License: Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ---

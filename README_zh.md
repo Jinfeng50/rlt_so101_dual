@@ -6,7 +6,6 @@
 
 RL Token 方法（[Physical Intelligence](https://www.pi.website/research/rlt)，arXiv [2604.23073](https://arxiv.org/abs/2604.23073)）在 SO101 双臂场景上的适配 / demo。**非** PI 官方发布。
 
-配置：[`configs/README.md`](configs/README.md) · 数据约定：[`src/rlt_so101_dual/core/shape_contract.py`](src/rlt_so101_dual/core/shape_contract.py)  
 许可证：Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ---
@@ -25,12 +24,13 @@ https://github.com/user-attachments/assets/4be130b2-9381-404e-81cc-ce5aa3d7d9ee
 
 ## 能做什么
 
-| 阶段 | CLI |
-| --- | --- |
-| 硬件检查 | `rlt-so101-dual-preflight` |
-| Demo / VLA 评测录制 | `rlt-so101-dual-record` |
+
+| 阶段                | CLI                             |
+| ------------------- | ------------------------------- |
+| 硬件检查            | `rlt-so101-dual-preflight`      |
+| Demo / VLA 评测录制 | `rlt-so101-dual-record`         |
 | RL Token（Stage B） | `rlt-so101-dual-train-rl-token` |
-| 真机 online RL | `rlt-so101-dual-online-train` |
+| 真机 online RL      | `rlt-so101-dual-online-train`   |
 
 ```text
 preflight → record(teleop) → π0.5 SFT → train-rl-token → online-train
@@ -45,10 +45,10 @@ obs → π0.5 → tokens + ref_chunk → RLToken → z_rl
 
 ## 环境要求
 
-- Linux，Python ≥ 3.12  
-- LeRobot **0.5.1**（含 π0.5 extras）+ Feetech SDK  
-- SO101 **双臂**（2 从臂 + 2 主臂）+ 3 路相机（`left_wrist` / `right_wrist` / `right_front`）  
-- GPU：采集机可做 online 推理；完整 π0.5 SFT 需要大显存训练机  
+- Linux，Python ≥ 3.12
+- LeRobot **0.5.1**（含 π0.5 extras）+ Feetech SDK
+- SO101 **双臂**（2 从臂 + 2 主臂）+ 3 路相机（`left_wrist` / `right_wrist` / `right_front`）
+- GPU：采集机可做 online 推理；完整 π0.5 SFT 需要大显存训练机
 
 ---
 
@@ -103,11 +103,12 @@ images: left_wrist / right_wrist / right_front  →  π0.5 slots
 RL chunk C=10 · VLA H=50 · RL token dim=2048
 ```
 
-| 配置 | 路径 |
-| --- | --- |
-| 硬件 | `configs/hardware/so101_dual_manifest.json`（由 `.example.json` 复制） |
-| Rename map | `configs/rename_maps/so101_dual.json` |
-| RLT yaml | `configs/rlt/so101_dual_rlt.yaml` |
+
+| 配置       | 路径                                                                   |
+| ---------- | ---------------------------------------------------------------------- |
+| 硬件       | `configs/hardware/so101_dual_manifest.json`（由 `.example.json` 复制） |
+| Rename map | `configs/rename_maps/so101_dual.json`                                  |
+| RLT yaml   | `configs/rlt/so101_dual_rlt.yaml`                                      |
 
 ---
 
@@ -119,11 +120,12 @@ RL chunk C=10 · VLA H=50 · RL token dim=2048
 
 ## 命名
 
-| 类型 | 名称 |
-| --- | --- |
-| 包名 | `rlt_so101_dual` |
-| CLI | `rlt-so101-dual-*` |
-| LeRobot `policy.type` | `rlt_token` / `rlt_ac` |
+
+| 类型                 | 名称                   |
+| -------------------- | ---------------------- |
+| 包名                 | `rlt_so101_dual`       |
+| CLI                  | `rlt-so101-dual-*`     |
+| LeRobot`policy.type` | `rlt_token` / `rlt_ac` |
 
 ---
 
