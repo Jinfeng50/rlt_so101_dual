@@ -11,6 +11,18 @@ RL Token 方法（[Physical Intelligence](https://www.pi.website/research/rlt)�
 
 ---
 
+## 案例视频
+
+### 成功案例
+
+<video src="assets/成功.mp4" poster="assets/success-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+
+### 失败案例
+
+<video src="assets/失败.mp4" poster="assets/failure-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+
+---
+
 ## 能做什么
 
 | 阶段 | CLI |

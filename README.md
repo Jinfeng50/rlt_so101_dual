@@ -11,6 +11,18 @@ License: Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ---
 
+## Demo videos
+
+### Successful case
+
+<video src="assets/成功.mp4" poster="assets/success-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+
+### Failed case
+
+<video src="assets/失败.mp4" poster="assets/failure-preview.jpg" controls playsinline preload="metadata" width="640"></video>
+
+---
+
 ## What you get
 
 | Stage | CLI |
