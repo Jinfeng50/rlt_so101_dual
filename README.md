@@ -6,7 +6,7 @@
 
 SO101 dual-arm scenario / demo adaptation of the RL Token method ([Physical Intelligence](https://www.pi.website/research/rlt), arXiv [2604.23073](https://arxiv.org/abs/2604.23073)). Not an official PI release.
 
-Code map: [`configs/README.md`](configs/README.md) · [`src/rlt_so101_dual/core/shape_contract.py`](src/rlt_so101_dual/core/shape_contract.py)  
+Code map: [`configs/README.md`](configs/README.md) · [`src/rlt_so101_dual/core/shape_contract.py`](src/rlt_so101_dual/core/shape_contract.py)
 License: Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ---
@@ -15,22 +15,21 @@ License: Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ### Successful case
 
-<video src="assets/成功.mp4" poster="assets/success-preview.jpg" controls playsinline preload="metadata" width="640"></video>
 
 ### Failed case
 
-<video src="assets/失败.mp4" poster="assets/failure-preview.jpg" controls playsinline preload="metadata" width="640"></video>
 
 ---
 
 ## What you get
 
-| Stage | CLI |
-| --- | --- |
-| Hardware check | `rlt-so101-dual-preflight` |
-| Demo / VLA eval record | `rlt-so101-dual-record` |
-| RL Token (Stage B) | `rlt-so101-dual-train-rl-token` |
-| Real-robot online RL | `rlt-so101-dual-online-train` |
+
+| Stage                  | CLI                             |
+| ---------------------- | ------------------------------- |
+| Hardware check         | `rlt-so101-dual-preflight`      |
+| Demo / VLA eval record | `rlt-so101-dual-record`         |
+| RL Token (Stage B)     | `rlt-so101-dual-train-rl-token` |
+| Real-robot online RL   | `rlt-so101-dual-online-train`   |
 
 ```text
 preflight → record(teleop) → π0.5 SFT → train-rl-token → online-train
@@ -45,10 +44,10 @@ obs → π0.5 → tokens + ref_chunk → RLToken → z_rl
 
 ## Requirements
 
-- Linux, Python ≥ 3.12  
-- LeRobot **0.5.1** with π0.5 extras + Feetech SDK  
-- SO101 **bimanual** (2 followers + 2 leaders) + 3 cameras (`left_wrist`, `right_wrist`, `right_front`)  
-- GPU: capture PC can run online inference; full π0.5 SFT wants a large-GPU training machine  
+- Linux, Python ≥ 3.12
+- LeRobot **0.5.1** with π0.5 extras + Feetech SDK
+- SO101 **bimanual** (2 followers + 2 leaders) + 3 cameras (`left_wrist`, `right_wrist`, `right_front`)
+- GPU: capture PC can run online inference; full π0.5 SFT wants a large-GPU training machine
 
 ---
 
@@ -103,11 +102,12 @@ images: left_wrist / right_wrist / right_front  →  π0.5 slots
 RL chunk C=10 · VLA H=50 · RL token dim=2048
 ```
 
-| Config | Path |
-| --- | --- |
-| Hardware | `configs/hardware/so101_dual_manifest.json` (from `.example.json`) |
-| Rename map | `configs/rename_maps/so101_dual.json` |
-| RLT yaml | `configs/rlt/so101_dual_rlt.yaml` |
+
+| Config     | Path                                                               |
+| ---------- | ------------------------------------------------------------------ |
+| Hardware   | `configs/hardware/so101_dual_manifest.json` (from `.example.json`) |
+| Rename map | `configs/rename_maps/so101_dual.json`                              |
+| RLT yaml   | `configs/rlt/so101_dual_rlt.yaml`                                  |
 
 ---
 
@@ -119,11 +119,12 @@ This software is **not** a hardware e-stop. Keep a hand on the leaders / power w
 
 ## Naming
 
-| Kind | Name |
-| --- | --- |
-| Package | `rlt_so101_dual` |
-| CLI | `rlt-so101-dual-*` |
-| LeRobot `policy.type` | `rlt_token` / `rlt_ac` |
+
+| Kind                 | Name                   |
+| -------------------- | ---------------------- |
+| Package              | `rlt_so101_dual`       |
+| CLI                  | `rlt-so101-dual-*`     |
+| LeRobot`policy.type` | `rlt_token` / `rlt_ac` |
 
 ---
 
