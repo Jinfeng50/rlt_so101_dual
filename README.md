@@ -15,9 +15,11 @@ License: Apache-2.0 · [`LICENSE`](LICENSE) / [`NOTICE`](NOTICE)
 
 ### Successful case
 
+https://github.com/user-attachments/assets/4d54dbf1-9824-471b-91f6-3ea72269602a
 
 ### Failed case
 
+https://github.com/user-attachments/assets/4be130b2-9381-404e-81cc-ce5aa3d7d9ee
 
 ---
 
