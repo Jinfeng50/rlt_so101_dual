@@ -116,10 +116,10 @@ class DatasetRecordConfig:
     num_episodes: int = 50
     # Encode frames in the dataset into video
     video: bool = True
-    # Upload dataset to Hugging Face hub.
-    push_to_hub: bool = True
-    # Upload on private repository on the Hugging Face hub.
-    private: bool = False
+    # Upload dataset to Hugging Face hub. Off by default so a record run stays local.
+    push_to_hub: bool = False
+    # If upload is explicitly enabled, keep the Hub repo private unless overridden.
+    private: bool = True
     # Add tags to your dataset on the hub.
     tags: list[str] | None = None
     # Number of subprocesses handling the saving of frames as PNG. Set to 0 to use threads only;

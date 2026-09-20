@@ -343,7 +343,8 @@ def main() -> None:
                 print(f"{name}: {frame.shape} -> {out}")
             return
 
-        server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(cameras))
+        # Bind loopback only. 0.0.0.0 would expose the camera stream on the LAN.
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(cameras))
         print(f"Live preview on http://localhost:{args.port}   (Ctrl-C to stop)")
         print(f"  cameras: {', '.join(f'{k}={v}' for k, v in devices.items())}")
         print("  over SSH:  ssh -L {0}:localhost:{0} <user>@<host>".format(args.port))
